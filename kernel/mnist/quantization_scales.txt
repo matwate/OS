@@ -1,0 +1,4 @@
+layer1_weight_scale: 0.00187654
+layer2_weight_scale: 0.00125406
+layer3_weight_scale: 0.00160851
+layer4_weight_scale: 0.00508599

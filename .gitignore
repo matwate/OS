@@ -1,0 +1,8 @@
+# Build artifacts
+boot.bin
+kernel.bin
+kernel.o
+os.img
+
+# MNIST weights (11 MB — regenerate from training)
+kernel/mnist/mnist_params.h

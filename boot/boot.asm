@@ -21,9 +21,9 @@ mov byte [boot_drive], dl
 mov bx, msg_hello_world
 call print_bios
 
-; Load the next sector
-mov bx, 0x0002
-; Load 64 sectors (32 KB) so the kernel has room to grow.
+; Load the kernel (starts right after boot sector)
+mov bx, 0x0001
+; Load 4096 sectors (32 KB) so the kernel has room to grow.
 mov cx, 0x0040
 mov dx, 0x7E00
 call load_bios
@@ -40,10 +40,10 @@ bootsector_hold:
 jmp $
 
 ; INCLUDES
-%include "real_mode/print.asm"
-%include "real_mode/load.asm"
-%include "real_mode/gdt.asm"
-%include "real_mode/elevate.asm"
+%include "boot/real_mode/print.asm"
+%include "boot/real_mode/load.asm"
+%include "boot/real_mode/gdt.asm"
+%include "boot/real_mode/elevate.asm"
 
 ; DATA STORAGE AREA
 

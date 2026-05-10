@@ -2,27 +2,54 @@
 set -e
 
 echo "Assembling bootloader..."
-nasm -f bin boot.asm -o boot.bin
+nasm -f bin boot/boot.asm -o boot.bin
 
 echo "Compiling kernel..."
-gcc -ffreestanding -nostdlib -m32 -fno-stack-protector -fno-pie -c kernel.c -o kernel.o
+gcc -ffreestanding -nostdlib -m32 -fno-stack-protector -fno-pie -fno-PIC \
+    -c kernel/ata.c -o kernel/ata.o
+gcc -ffreestanding -nostdlib -m32 -fno-stack-protector -fno-pie -fno-PIC \
+    -c kernel/mnist.c -o kernel/mnist.o
+gcc -ffreestanding -nostdlib -m32 -fno-stack-protector -fno-pie -fno-PIC \
+    -c kernel/kernel.c -o kernel.o
 
 echo "Linking kernel at 0x7E00..."
-ld -m elf_i386 -T linker.ld -o kernel.bin kernel.o
+ld -m elf_i386 -T kernel/kernel.ld -o kernel.bin kernel/ata.o kernel/mnist.o kernel.o
 
-# Determine actual kernel size and warn if it exceeds 64 sectors
+# Kernel size in sectors
 KERNEL_SIZE=$(stat -c%s kernel.bin)
-MAX_SIZE=$((64 * 512))
-if [ "$KERNEL_SIZE" -gt "$MAX_SIZE" ]; then
-    echo "WARNING: Kernel is $KERNEL_SIZE bytes, but bootloader only loads $MAX_SIZE bytes!"
-    echo "Edit boot.asm and increase mov cx, 0x0040 to a larger value."
-    exit 1
-fi
+echo "Kernel size: $KERNEL_SIZE bytes"
 
-echo "Padding kernel to 64 sectors (32 KB)..."
-truncate -s $MAX_SIZE kernel.bin
+# Round up to nearest sector (512 bytes)
+PADDING=$(( (KERNEL_SIZE + 511) / 512 * 512 ))
+echo "Padding kernel to $PADDING bytes ($(( PADDING / 512 )) sectors)..."
+truncate -s $PADDING kernel.bin
 
-echo "Building disk image..."
-cat boot.bin kernel.bin > os.img
+# Weights LBA = kernel sectors + 1 (boot sector is LBA 0)
+WEIGHTS_LBA=$(( PADDING / 512 + 1 ))
+echo "Weights LBA: $WEIGHTS_LBA"
 
-echo "Done. Kernel is $KERNEL_SIZE bytes. Run with: qemu-system-i386 -fda os.img"
+# Build again with the computed LBA
+echo "Recompiling with WEIGHTS_LBA=$WEIGHTS_LBA..."
+gcc -ffreestanding -nostdlib -m32 -fno-stack-protector -fno-pie -fno-PIC \
+    -DWEIGHTS_LBA=$WEIGHTS_LBA \
+    -c kernel/kernel.c -o kernel.o
+ld -m elf_i386 -T kernel/kernel.ld -o kernel.bin kernel/ata.o kernel/mnist.o kernel.o
+
+PADDING=$(( ( $(stat -c%s kernel.bin) + 511) / 512 * 512 ))
+truncate -s $PADDING kernel.bin
+WEIGHTS_LBA=$(( PADDING / 512 + 1 ))
+echo "Final kernel: $PADDING bytes, weights at LBA $WEIGHTS_LBA"
+
+# Build disk image
+cat boot.bin kernel.bin kernel/mnist/weights_int8.bin > os.img
+
+# Verify sizes
+echo ""
+echo "=== Layout ==="
+echo "Boot sector:    LBA 0  (512 bytes)"
+echo "Kernel:         LBA 1..$((PADDING/512-1))  ($PADDING bytes, $((PADDING/512)) sectors)"
+echo "Weights:        LBA $WEIGHTS_LBA..$((WEIGHTS_LBA+1568))  (802,360 bytes, 1569 sectors)"
+echo ""
+echo "Done. Run with: qemu-system-i386 -hda os.img"
+echo "Note: Use -hda (not -fda) for ATA PIO to work."
+echo "      Floppy (-fda) uses FDC at 0x3F0, not ATA at 0x1F0."
