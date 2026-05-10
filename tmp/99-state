@@ -1,1 +1,1 @@
-{"requests":[{"data":{"type":"search","qfix_items":[],"response":""},"user_prompt":"test"}]}
+{"requests":[{"data":{"qfix_items":[],"response":"","type":"search"},"user_prompt":"test"}]}

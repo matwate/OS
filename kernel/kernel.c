@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include "mnist.h"
 
 #define VGA_ADDR ((unsigned char *)0xA0000)
 #define VGA_WIDTH 320
@@ -22,7 +23,7 @@ int mouse_buttons = 0, prev_mouse_buttons = 0;
 int grid[GRID_N][GRID_N];
 
 /* Weights buffer — loaded from disk at startup */
-uint8_t weights_buf[802360] __attribute__((section(".bss")));
+uint8_t weights_buf[3194368] __attribute__((section(".bss")));
 
 /* Forward declarations */
 void clear_screen(unsigned char c);
@@ -213,11 +214,10 @@ void __attribute__((section(".text.start"))) kernel_main(void) {
 
     /* Load MNIST weights from disk.
      * Kernel occupies LBA 1..K (padded to sector boundary).
-     * Weights start at LBA K+1, size 1,569 sectors (802,360 bytes).
-     * If kernel <= 64 sectors (32 KB), weights start at LBA 65.
+     * Weights start at LBA K+1.
      * The build script passes the exact offset at compile time. */
 #ifdef WEIGHTS_LBA
-    int result = ata_pio_read(WEIGHTS_LBA, 1569, weights_buf);
+    int result = ata_pio_read(WEIGHTS_LBA, MNIST_WEIGHTS_SECTORS, weights_buf);
     (void)result;
     mnist_pointers();
 #else

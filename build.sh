@@ -41,14 +41,14 @@ WEIGHTS_LBA=$(( PADDING / 512 + 1 ))
 echo "Final kernel: $PADDING bytes, weights at LBA $WEIGHTS_LBA"
 
 # Build disk image
-cat boot.bin kernel.bin kernel/mnist/weights_int8.bin > os.img
+cat boot.bin kernel.bin kernel/mnist/weights.bin > os.img
 
 # Verify sizes
 echo ""
 echo "=== Layout ==="
 echo "Boot sector:    LBA 0  (512 bytes)"
 echo "Kernel:         LBA 1..$((PADDING/512-1))  ($PADDING bytes, $((PADDING/512)) sectors)"
-echo "Weights:        LBA $WEIGHTS_LBA..$((WEIGHTS_LBA+1568))  (802,360 bytes, 1569 sectors)"
+echo "Weights:        LBA $WEIGHTS_LBA..$((WEIGHTS_LBA+6238))  (3,193,896 bytes, 6239 sectors)"
 echo ""
 echo "Done. Run with: qemu-system-i386 -hda os.img"
 echo "Note: Use -hda (not -fda) for ATA PIO to work."
