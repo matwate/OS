@@ -25,11 +25,15 @@ int grid[GRID_N][GRID_N];
 /* Weights buffer — loaded from disk at startup */
 uint8_t weights_buf[3194368] __attribute__((section(".bss")));
 
+/* Off-screen framebuffer to eliminate flicker */
+uint8_t framebuffer[VGA_WIDTH * VGA_HEIGHT] __attribute__((section(".bss")));
+
 /* Forward declarations */
 void clear_screen(unsigned char c);
 void putpixel(int x, int y, unsigned char c);
 void fill_rect(int x, int y, int w, int h, unsigned char c);
 void draw_rect(int x, int y, int w, int h, unsigned char c);
+void flip(void);
 bool mouse_in_grid_b(int mx, int my);
 int left_just_pressed(void);
 int left_held(void);
@@ -39,11 +43,14 @@ int mnist_classify(const float *image);
 
 /* === Graphics === */
 void clear_screen(unsigned char c) {
-    for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) VGA_ADDR[i] = c;
+    for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) framebuffer[i] = c;
 }
 void putpixel(int x, int y, unsigned char c) {
     if (x < 0 || x >= VGA_WIDTH || y < 0 || y >= VGA_HEIGHT) return;
-    VGA_ADDR[y * VGA_WIDTH + x] = c;
+    framebuffer[y * VGA_WIDTH + x] = c;
+}
+void flip(void) {
+    for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) VGA_ADDR[i] = framebuffer[i];
 }
 void fill_rect(int x, int y, int w, int h, unsigned char c) {
     for (int r = y; r < y + h; r++)
@@ -254,5 +261,6 @@ void __attribute__((section(".text.start"))) kernel_main(void) {
         }
 
         draw_cursor();
+        flip();
     }
 }
