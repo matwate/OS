@@ -1,5 +1,13 @@
 # Raw Block Device Read: Loading MNIST Weights into a Protected-Mode Kernel
 
+> **Bug Fix Log (2026-05-27):** The classifier always returned `0` regardless of the drawn digit.
+> **Root cause:** `grid_to_pixels()` in `kernel.c` iterated `out[row*28+col] = grid_get(row, col)`.
+> The `grid[]` array is indexed as `grid[x][y]` (first index = X horizontal axis), but MNIST format
+> expects `out[row*28+col]` where `row` = Y (vertical). Passing `grid_get(row, col)` = `grid[Y][X]`
+> sent a **transposed image** to the network. Fixed to `grid_get(col, row)` = `grid[X][Y]`.
+> The ATA PIO read chunking logic was verified correct and required no changes.
+
+
 > This tutorial is written for a bare-metal x86 project with a BIOS bootloader, a 32-bit protected-mode C kernel, and the need to load large binary data (MNIST neural network weights) from disk at runtime.
 
 ---

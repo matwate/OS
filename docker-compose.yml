@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  # ─────────────────────────────────────────────
+  # BUILD: Compiles the bare-metal OS
+  #   Uses: nasm, gcc -m32, ld -m elf_i386
+  #   Produces: os.img (disk image)
+  # ─────────────────────────────────────────────
+  build:
+    build:
+      context: .
+      dockerfile: Dockerfile.build
+    image: os-builder
+    container_name: os-builder
+    volumes:
+      # Mount entire project so compiled artifacts appear on Windows
+      - .:/os
+    working_dir: /os
+
+  # ─────────────────────────────────────────────
+  # RUN: Boots the OS in QEMU
+  #   Display via VNC → connect to localhost:5900
+  # ─────────────────────────────────────────────
+  run:
+    build:
+      context: .
+      dockerfile: Dockerfile.run
+    image: os-runner
+    container_name: os-runner
+    volumes:
+      # Mount only the disk image (writable so QEMU can open it)
+      - ./os.img:/os/os.img
+    ports:
+      - "5900:5900"
