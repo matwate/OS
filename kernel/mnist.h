@@ -10,42 +10,47 @@
 #define MNIST_HID3   256
 #define MNIST_OUT    10
 
-/* Binary layout of weights.bin (all float32, per-layer: bias then weights):
- *   [512 floats]  b1: layer1 bias
- *   [784*512 fl]  w1: layer1 weights
- *   [512 floats]  b2: layer2 bias
- *   [512*512 fl]  w2: layer2 weights
- *   [256 floats]  b3: layer3 bias
- *   [512*256 fl]  w3: layer3 weights
- *   [10 floats]   b4: layer4 bias
- *   [256*10 fl]   w4: layer4 weights
+/* Binary layout of weights_int8.bin:
+ *   [4 float32]      per-layer int8 weight scales
+ *   [784*512 int8]   w1: layer1 weights
+ *   [512*512 int8]   w2: layer2 weights
+ *   [512*256 int8]   w3: layer3 weights
+ *   [256*10 int8]    w4: layer4 weights
+ *   [512 float32]    b1: layer1 bias
+ *   [512 float32]    b2: layer2 bias
+ *   [256 float32]    b3: layer3 bias
+ *   [10 float32]     b4: layer4 bias
  *
- * Total: 3,193,896 bytes = 6,239 sectors
+ * Total: 802,360 bytes = 1,568 sectors after padding.
+ * Float32 values are converted to fixed point with integer bit parsing so the
+ * kernel does not emit or depend on x87 floating-point instructions.
  */
 
 /* Size of the weights file in sectors (ceiling division) */
-#define MNIST_WEIGHTS_SECTORS ((3193896 + 511) / 512)  /* = 6239 */
+#define MNIST_WEIGHTS_BYTES   802360
+#define MNIST_WEIGHTS_SECTORS ((MNIST_WEIGHTS_BYTES + 511) / 512)  /* = 1568 */
+#define MNIST_WEIGHTS_BUFSIZE (MNIST_WEIGHTS_SECTORS * 512)
 
 /* Byte offsets into the weights file */
-#define OFF_LAYER1_BIAS     0
-#define OFF_LAYER1_WEIGHTS  (OFF_LAYER1_BIAS    + 512 * 4)                /* 2,048 */
-#define OFF_LAYER2_BIAS     (OFF_LAYER1_WEIGHTS + 784 * 512 * 4)          /* 1,607,680 */
-#define OFF_LAYER2_WEIGHTS  (OFF_LAYER2_BIAS    + 512 * 4)                /* 1,609,728 */
-#define OFF_LAYER3_BIAS     (OFF_LAYER2_WEIGHTS + 512 * 512 * 4)          /* 2,658,304 */
-#define OFF_LAYER3_WEIGHTS  (OFF_LAYER3_BIAS    + 256 * 4)                /* 2,659,328 */
-#define OFF_LAYER4_BIAS     (OFF_LAYER3_WEIGHTS + 512 * 256 * 4)          /* 3,183,616 */
-#define OFF_LAYER4_WEIGHTS  (OFF_LAYER4_BIAS    + 10 * 4)                 /* 3,183,656 */
+#define OFF_WEIGHT_SCALES    0
+#define OFF_LAYER1_WEIGHTS   (OFF_WEIGHT_SCALES  + 4 * 4)                /* 16 */
+#define OFF_LAYER2_WEIGHTS   (OFF_LAYER1_WEIGHTS + 784 * 512)            /* 401,424 */
+#define OFF_LAYER3_WEIGHTS   (OFF_LAYER2_WEIGHTS + 512 * 512)            /* 663,568 */
+#define OFF_LAYER4_WEIGHTS   (OFF_LAYER3_WEIGHTS + 512 * 256)            /* 794,640 */
+#define OFF_LAYER1_BIAS      (OFF_LAYER4_WEIGHTS + 256 * 10)             /* 797,200 */
+#define OFF_LAYER2_BIAS      (OFF_LAYER1_BIAS    + 512 * 4)              /* 799,248 */
+#define OFF_LAYER3_BIAS      (OFF_LAYER2_BIAS    + 512 * 4)              /* 801,296 */
+#define OFF_LAYER4_BIAS      (OFF_LAYER3_BIAS    + 256 * 4)              /* 802,320 */
 
 /* Static buffer to hold weights after loading from disk.
- * Sector-aligned: 6239 sectors * 512 bytes = 3,194,368.
- * Declared in mnist.c, referenced by mnist.c and kernel.c */
-extern uint8_t weights_buf[3194368];
+ * Declared in kernel.c, referenced by mnist.c and kernel.c. */
+extern uint8_t weights_buf[MNIST_WEIGHTS_BUFSIZE];
 
-/* Layer pointers — point into weights_buf after loading.
+/* Parse int8 weights and convert float32 scales/biases to fixed point.
  * Must be called once after ata_pio_read completes. */
 void mnist_pointers(void);
 
-/* Classify a 784-pixel image (normalized 0..255 -> 0..1) */
-int mnist_classify(const float *image);
+/* Classify a 784-pixel binary image using fixed-point int8 inference. */
+int mnist_classify(const uint8_t *image);
 
 #endif /* MNIST_H */

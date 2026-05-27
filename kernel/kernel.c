@@ -23,7 +23,7 @@ int mouse_buttons = 0, prev_mouse_buttons = 0;
 int grid[GRID_N][GRID_N];
 
 /* Weights buffer — loaded from disk at startup */
-uint8_t weights_buf[3194368] __attribute__((section(".bss")));
+uint8_t weights_buf[MNIST_WEIGHTS_BUFSIZE] __attribute__((section(".bss")));
 
 /* Off-screen framebuffer to eliminate flicker */
 uint8_t framebuffer[VGA_WIDTH * VGA_HEIGHT] __attribute__((section(".bss")));
@@ -39,7 +39,7 @@ int left_just_pressed(void);
 int left_held(void);
 int ata_pio_read(uint32_t lba, uint16_t count, void *dst);
 void mnist_pointers(void);
-int mnist_classify(const float *image);
+int mnist_classify(const uint8_t *image);
 
 /* === Graphics === */
 void clear_screen(unsigned char c) {
@@ -96,11 +96,11 @@ bool mouse_in_grid_b(int mx, int my) {
            my >= Y_PADDING && my < Y_PADDING + GRID_N * CELL_SIZE;
 }
 
-/* === Pixel-to-float conversion for MNIST === */
-void grid_to_pixels(float out[784]) {
+/* === Pixel conversion for fixed-point MNIST === */
+void grid_to_pixels(uint8_t out[784]) {
     for (int row = 0; row < GRID_N; row++)
         for (int col = 0; col < GRID_N; col++)
-            out[row * GRID_N + col] = grid_get(row, col) ? 1.0f : 0.0f;
+            out[row * GRID_N + col] = grid_get(row, col) ? 1 : 0;
 }
 
 /* === Button === */
@@ -249,7 +249,7 @@ void __attribute__((section(".text.start"))) kernel_main(void) {
             if (mouse_in_button(mouse_x, mouse_y, &clear_btn))
                 clear_grid();
             else if (mouse_in_button(mouse_x, mouse_y, &classify_btn)) {
-                float pixels[784];
+                uint8_t pixels[784];
                 grid_to_pixels(pixels);
                 last_digit = mnist_classify(pixels);
             }
