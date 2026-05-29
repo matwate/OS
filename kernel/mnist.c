@@ -1,8 +1,7 @@
 #include "mnist.h"
 
 /* Weights are loaded here by kernel.c after calling ata_pio_read().
- * The array is defined in kernel.c to avoid duplicate symbol errors. */
-extern uint8_t weights_buf[3194368];
+ * The pointer is defined in kernel.c and exported via mnist.h. */
 
 /* Layer pointers — set by mnist_pointers() after disk load */
 static const float *w1 = 0, *w2 = 0, *w3 = 0, *w4 = 0;

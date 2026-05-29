@@ -1,0 +1,20 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    qemu-system-x86 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /os
+
+# Run QEMU with VNC display on port 5900
+# -drive format=raw → explicit raw format (avoids probing warning)
+# -vnc 0.0.0.0:0   → VNC on port 5900 (display :0)
+# -m 32            → 32MB RAM (enough for bare-metal kernel)
+# -no-reboot       → stop instead of rebooting on triple fault
+CMD ["qemu-system-i386", \
+     "-drive", "format=raw,file=os.img", \
+     "-m", "32", \
+     "-vnc", "0.0.0.0:0", \
+     "-no-reboot"]

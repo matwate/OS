@@ -37,9 +37,8 @@
 #define OFF_LAYER4_WEIGHTS  (OFF_LAYER4_BIAS    + 10 * 4)                 /* 3,183,656 */
 
 /* Static buffer to hold weights after loading from disk.
- * Sector-aligned: 6239 sectors * 512 bytes = 3,194,368.
- * Declared in mnist.c, referenced by mnist.c and kernel.c */
-extern uint8_t weights_buf[3194368];
+ * Declared in kernel.c as a pointer to the 2MB physical mark. */
+extern uint8_t *weights_buf;
 
 /* Layer pointers — point into weights_buf after loading.
  * Must be called once after ata_pio_read completes. */

@@ -22,8 +22,10 @@ int mouse_x = 160, mouse_y = 100;
 int mouse_buttons = 0, prev_mouse_buttons = 0;
 int grid[GRID_N][GRID_N];
 
-/* Weights buffer — loaded from disk at startup */
-uint8_t weights_buf[3194368] __attribute__((section(".bss")));
+/* Weights buffer — loaded from disk at startup.
+ * We point this to the 2MB mark in physical RAM to prevent
+ * the 3.2MB buffer from overlapping the 0xA0000-0xFFFFF memory hole. */
+uint8_t *weights_buf = (uint8_t *)0x00200000;
 
 /* Off-screen framebuffer to eliminate flicker */
 uint8_t framebuffer[VGA_WIDTH * VGA_HEIGHT] __attribute__((section(".bss")));
@@ -69,6 +71,10 @@ void clear_grid(void) {
 }
 void grid_set(int x, int y) {
     if (x >= 0 && x < GRID_N && y >= 0 && y < GRID_N) grid[x][y] = WHITE;
+    if (x - 1 >= 0 && x - 1 < GRID_N && y >= 0 && y < GRID_N) grid[x - 1][y] = WHITE;
+    if (x + 1 >= 0 && x + 1 < GRID_N && y >= 0 && y < GRID_N) grid[x + 1][y] = WHITE;
+    if (x >= 0 && x < GRID_N && y - 1 >= 0 && y - 1 < GRID_N) grid[x][y - 1] = WHITE;
+    if (x >= 0 && x < GRID_N && y + 1 >= 0 && y + 1 < GRID_N) grid[x][y + 1] = WHITE;
 }
 bool grid_get(int x, int y) {
     if (x < 0 || x >= GRID_N || y < 0 || y >= GRID_N) return false;
@@ -98,9 +104,44 @@ bool mouse_in_grid_b(int mx, int my) {
 
 /* === Pixel-to-float conversion for MNIST === */
 void grid_to_pixels(float out[784]) {
-    for (int row = 0; row < GRID_N; row++)
-        for (int col = 0; col < GRID_N; col++)
-            out[row * GRID_N + col] = grid_get(row, col) ? 1.0f : 0.0f;
+    float temp[GRID_N][GRID_N];
+
+    /* Convert grid to binary float array, fixing the X/Y transpose bug:
+     * grid_get expects (x, y), so we pass (col, row). */
+    for (int row = 0; row < GRID_N; row++) {
+        for (int col = 0; col < GRID_N; col++) {
+            temp[row][col] = grid_get(col, row) ? 1.0f : 0.0f;
+        }
+    }
+
+    /* Apply a 3x3 Box Blur to simulate soft anti-aliased edges (grayscales) */
+    for (int row = 0; row < GRID_N; row++) {
+        for (int col = 0; col < GRID_N; col++) {
+            float sum = 0.0f;
+            int count = 0;
+
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int ny = row + dy;
+                    int nx = col + dx;
+                    if (ny >= 0 && ny < GRID_N && nx >= 0 && nx < GRID_N) {
+                        sum += temp[ny][nx];
+                        count++;
+                    }
+                }
+            }
+
+            /* Average the neighbors */
+            float avg = sum / (float)count;
+            
+            /* Boost the brightness slightly so the core of the line stays strong.
+             * This creates a nice gradient: 1.0 in the center, ~0.5 on the edges. */
+            avg *= 1.5f;
+            if (avg > 1.0f) avg = 1.0f;
+
+            out[row * GRID_N + col] = avg;
+        }
+    }
 }
 
 /* === Button === */
